@@ -13,7 +13,7 @@
 #include <ixpio.h>
 
 
-#define BIND_PORT 22223
+#define BIND_PORT 22224
 #define BUFF_SIZE 256
 
 #define COUNTER_DEV_FILE "/dev/ixpio1"
@@ -48,14 +48,14 @@ static struct sigaction act_old;
 
 
 int main(int argc,char **argv){
-    char buff[BUFF_SIZE];
+    char cmd = 0x00;
     int i, conn;
-    for(i=0;i<BUFF_SIZE;i++) buff[i] = 0x00;
 
     init_counter();
     
     
-    struct sockaddr_in serv_addr;
+    struct sockaddr_in serv_addr,client_addr;
+    socklen_t client_len;
 
     int sock = socket(AF_INET,SOCK_STREAM,0);
     serv_addr.sin_family = AF_INET;
@@ -72,13 +72,23 @@ int main(int argc,char **argv){
       exit(-1);
     }
 
+
+    client_len = sizeof(client_addr);
     while(1){
-      conn = accept(sock,(struct sockaddr *)&serv_addr,sizeof(serv_addr));
+      cmd = 0x00;
+      conn = accept(sock,(struct sockaddr *)&client_addr,&client_len);
       if(conn < 0){
 	printf("sock: Error accept!\n");
       }
-      recv(conn,buff,1,0);
-      printf("sock: accept command: %s\n",buff);
+      recv(conn,&cmd,1,0);
+      printf("sock: accept command: %c\n",cmd);
+
+      switch(cmd){
+	// start command
+      case 's':
+	break;
+      }
+      
       
     }
     
