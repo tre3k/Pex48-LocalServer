@@ -49,17 +49,38 @@ static struct sigaction act_old;
 
 int main(int argc,char **argv){
     char buff[BUFF_SIZE];
-    int i;
+    int i, conn;
     for(i=0;i<BUFF_SIZE;i++) buff[i] = 0x00;
 
     init_counter();
     
     
-    struct sockaddr_in serv_adr;
+    struct sockaddr_in serv_addr;
 
     int sock = socket(AF_INET,SOCK_STREAM,0);
-    
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(BIND_PORT);
 
+    if(bind(sock,(struct sockaddr *)&serv_addr,sizeof(serv_addr))<0){
+      printf("sock: Error bind!\n");
+      exit(-1);
+    }
+    
+    if(listen(sock,10)<0){
+      printf("sock: Error listen port: %d\n",BIND_PORT);
+      exit(-1);
+    }
+
+    while(1){
+      conn = accept(sock,(struct sockaddr *)&serv_addr,sizeof(serv_addr));
+      if(conn < 0){
+	printf("sock: Error accept!\n");
+      }
+      recv(conn,buff,1,0);
+      printf("sock: accept command: %s\n",buff);
+      
+    }
     
     return 0;
 }
@@ -69,29 +90,31 @@ int main(int argc,char **argv){
 void init_counter(){
     _fd = open(COUNTER_DEV_FILE,O_RDWR);
     if(_fd < 0){
-      printf("Error open %s file!\nMay be driver not loaded?\n",COUNTER_DEV_FILE);
+      printf("counter: Error open %s file!\nMay be driver not loaded?\n",COUNTER_DEV_FILE);
       exit(-1);
     }
-    printf("File %s is open, descriptor: %d\n",COUNTER_DEV_FILE,_fd);
+    printf("counter: File %s is open, descriptor: %d\n",COUNTER_DEV_FILE,_fd);
     return;
 }
 
 
 void start_counter(){
+    printf("counter: Start counter!\n");
     
     
     return;
 }
 
 void stop_counter(){
-
+    printf("counter: Stop counter!\n");
 
     
     return;
 }
 
 int read_counter(){
-
+    unsigned int count = 123;
+    printf("counter: current count: %d", count);
 
     return;
 }
@@ -104,7 +127,7 @@ void write_counter_register(unsigned int regID, unsigned int value){
     
     if(ioctl(_fd, IXPIO_WRITE_REG, &reg)){
         sigaction(SIGALRM, &act_old, NULL);
-	printf("ERROR write to register! RegID: %d, value: %d\n",regID,value);
+	printf("counter: ERROR write to register! RegID: %d, value: %d\n",regID,value);
         close(_fd);
 	exit(-1);
     }
@@ -119,7 +142,7 @@ unsigned int read_counter_register(unsigned int regID){
 
     if(ioctl(_fd, IXPIO_READ_REG, &reg)){
         sigaction(SIGALRM, &act_old, NULL);
-	printf("ERROR read register! RegID: %d\n",regID);
+	printf("counter: ERROR read register! RegID: %d\n",regID);
 	close(_fd);
         exit(-1);
     }
@@ -128,8 +151,26 @@ unsigned int read_counter_register(unsigned int regID){
 
 }
 
+void set_counter1(uint16_t value){
+    write_counter_register(COUNTER0_REG,value & 0x00ff);
+    write_counter_register(COUNTER0_REG,(value & 0xff00)>>8);
+    return;
+}
+
+uint16_t get_counter1() {
+    uint16_t retval = 0;
+    uint8_t c_l = 0, c_h = 0;
+
+    c_l = read_counter_register(COUNTER0_REG)&0xff;
+    c_h = read_counter(COUNTER0_REG)&0xff;
+
+    retval = 65535-((c_h<<8)|c_l);
+    return retval;
+}
+
+
 
 void sig_handler(int sig){
     overflow ++;
-    printf("Interrupt! Overflow +1: %d\n",overflow);
+    printf("counter: Interrupt! Overflow +1: %d\n",overflow);
 }
