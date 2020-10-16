@@ -102,7 +102,7 @@ int main(int argc,char **argv){
       case 'r':
 	result_counter = get_counter1();
 	result_counter |= (overflow<<16);
-   
+	printf("counter: current counter = %d\n",result_counter);
 	send(conn,&result_counter,sizeof(unsigned long),0);
 	break;
       }
@@ -192,7 +192,20 @@ void start_counter(){
     write_counter_register(CLOCK_INT_CW,0x15);          // select 32kHz for timer and disable PC3 interrupts
     write_counter_register(INT_MASK_REG,0x04);          // Enable INT_CHAN_2 interrupt
 
-    
+    /* set Signal */
+    sig.sid = SIGALRM;
+    sig.pid = getpid();
+    sig.is = 0x04; //INT_CHAN_2
+    sig.edge = 0x04;
+    sig.bedge = 0;
+    if(ioctl(_fd,IXPIO_SIG,&sig)){
+        sigaction(SIGALRM, &act_old, NULL);
+        close(_fd);
+        printf("counter: Error set signal!\n"); 
+    }
+
+    write_counter_register(CW_8254,0x36);               // Binary count counter0 mode 3
+    set_counter1(0xffff);
     
     return;
 }
