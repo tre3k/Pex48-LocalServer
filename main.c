@@ -46,11 +46,15 @@ static ixpio_signal_t sig;
 static struct sigaction act;
 static struct sigaction act_old;
 
+unsigned long result_counter = 0;
+
+uint16_t get_counter1(void);
+void sig_handler(int);
 
 int main(int argc,char **argv){
     char cmd = 0x00;
     int i, conn;
-
+    
     init_counter();
     
     
@@ -86,6 +90,20 @@ int main(int argc,char **argv){
       switch(cmd){
 	// start command
       case 's':
+	start_counter();
+	break;
+
+	// stop command
+      case 'q':
+	stop_counter();
+	break;
+
+	// read command
+      case 'r':
+	result_counter = get_counter1();
+	result_counter |= (overflow<<16);
+   
+	send(conn,&result_counter,sizeof(unsigned long),0);
 	break;
       }
       
@@ -104,28 +122,6 @@ void init_counter(){
       exit(-1);
     }
     printf("counter: File %s is open, descriptor: %d\n",COUNTER_DEV_FILE,_fd);
-    return;
-}
-
-
-void start_counter(){
-    printf("counter: Start counter!\n");
-    
-    
-    return;
-}
-
-void stop_counter(){
-    printf("counter: Stop counter!\n");
-
-    
-    return;
-}
-
-int read_counter(){
-    unsigned int count = 123;
-    printf("counter: current count: %d", count);
-
     return;
 }
 
@@ -172,12 +168,47 @@ uint16_t get_counter1() {
     uint8_t c_l = 0, c_h = 0;
 
     c_l = read_counter_register(COUNTER0_REG)&0xff;
-    c_h = read_counter(COUNTER0_REG)&0xff;
+    c_h = read_counter_register(COUNTER0_REG)&0xff;
 
     retval = 65535-((c_h<<8)|c_l);
     return retval;
 }
 
+
+
+void start_counter(){
+    printf("counter: Start counter!\n");
+    
+    result_counter = 0;
+    overflow = 0;
+
+    /* set Signal action */
+    act.sa_handler = sig_handler;
+    sigemptyset(&act.sa_mask);
+    sigaddset(&act.sa_mask,SIGALRM);
+    sigaction(SIGALRM,&act,&act_old);
+
+    /* enable INT_CHAN_2 interrupt */
+    write_counter_register(CLOCK_INT_CW,0x15);          // select 32kHz for timer and disable PC3 interrupts
+    write_counter_register(INT_MASK_REG,0x04);          // Enable INT_CHAN_2 interrupt
+
+    
+    
+    return;
+}
+
+void stop_counter(){
+    printf("counter: Stop counter!\n");
+
+    write_counter_register(CW_8254,0x30);
+    sigaction(SIGALRM, &act_old, NULL);
+    result_counter = get_counter1();
+    result_counter |= (overflow<<16);
+   
+    set_counter1(0xffff);
+    
+    return;
+}
 
 
 void sig_handler(int sig){
