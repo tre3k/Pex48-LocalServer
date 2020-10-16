@@ -51,6 +51,8 @@ unsigned long result_counter = 0;
 uint16_t get_counter1(void);
 void sig_handler(int);
 
+static int _start = 0;
+
 int main(int argc,char **argv){
     char cmd = 0x00;
     int i, conn;
@@ -76,8 +78,9 @@ int main(int argc,char **argv){
       exit(-1);
     }
 
-
     client_len = sizeof(client_addr);
+
+    printf("sock: binded on :%d port\n",BIND_PORT);
     while(1){
       cmd = 0x00;
       conn = accept(sock,(struct sockaddr *)&client_addr,&client_len);
@@ -100,8 +103,10 @@ int main(int argc,char **argv){
 
 	// read command
       case 'r':
-	result_counter = get_counter1();
-	result_counter |= (overflow<<16);
+	if(_start){
+	  result_counter = get_counter1();
+	  result_counter |= (overflow<<16);
+	}
 	printf("counter: current counter = %d\n",result_counter);
 	send(conn,&result_counter,sizeof(unsigned long),0);
 	break;
@@ -177,6 +182,7 @@ uint16_t get_counter1() {
 
 
 void start_counter(){
+    _start = 1;
     printf("counter: Start counter!\n");
     
     result_counter = 0;
@@ -205,20 +211,24 @@ void start_counter(){
     }
 
     write_counter_register(CW_8254,0x36);               // Binary count counter0 mode 3
+    //set_counter1(0x4000);
     set_counter1(0xffff);
-    
     return;
 }
 
 void stop_counter(){
+    _start = 0;
     printf("counter: Stop counter!\n");
 
-    write_counter_register(CW_8254,0x30);
+    write_counter_register(CW_8254,0x00);
     sigaction(SIGALRM, &act_old, NULL);
     result_counter = get_counter1();
     result_counter |= (overflow<<16);
    
     set_counter1(0xffff);
+
+    write_counter_register(INT_MASK_REG,0x00);          // Disable interrupts
+
     
     return;
 }
