@@ -52,6 +52,7 @@ uint16_t get_counter1(void);
 void sig_handler(int);
 
 static int _start = 0;
+static const char ok_response = 'A';
 
 int main(int argc,char **argv){
     char cmd = 0x00;
@@ -94,11 +95,13 @@ int main(int argc,char **argv){
 	// start command
       case 's':
 	start_counter();
+	send(conn,&ok_response,1,0);
 	break;
 
 	// stop command
       case 'q':
 	stop_counter();
+	send(conn,&ok_response,1,0);
 	break;
 
 	// read command
@@ -226,8 +229,6 @@ void stop_counter(){
     result_counter |= (overflow<<16);
    
     set_counter1(0xffff);
-
-    write_counter_register(INT_MASK_REG,0x00);          // Disable interrupts
 
     
     return;
